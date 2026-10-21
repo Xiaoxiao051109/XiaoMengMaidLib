@@ -1,0 +1,17 @@
+name: XiaoMengMaidLib
+version: '${version}'
+main: io.github.tlm.folia.open.OpenPlugin
+load: STARTUP
+api-version: '${apiVersion}'
+description: Touhou Little Maid (Folia) open package - converted assets + chess engines
+authors: [TartaricAcid, Snownee]
+folia-supported: true
+
+dependencies:
+  server:
+    CraftEngine:
+      load: BEFORE
+      required: true
+    BetterModel:
+      load: BEFORE
+      required: true

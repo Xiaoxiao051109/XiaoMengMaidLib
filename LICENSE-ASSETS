@@ -1,0 +1,19 @@
+Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0)
+=======================================================================
+
+本仓库中由「Touhou Little Maid（车万女仆）」原模组转换而来的全部素材
+（包括但不限于：模型 .bbmodel、贴图 .png、动画 .json、音效 .ogg、语言文本、
+资源包与 CraftEngine 内容包中的模型/贴图数据）均按 **CC BY-NC-SA 4.0** 授权：
+
+- 署名（BY）：必须注明原作者 tartaric_acid 及各位美术/音效贡献者（见 THIRD-PARTY.md）；
+- 非商业（NC）：不得用于商业目的，不得作为任何付费或变现产品/服务的一部分分发；
+- 相同方式共享（SA）：改编后的素材必须以同一协议（或兼容协议）发布；
+- 不得附加额外限制。
+
+协议全文：https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode
+协议摘要：https://creativecommons.org/licenses/by-nc-sa/4.0/
+
+注意：本仓库的**代码**（`api/`、`plugin/`、`converter/`、`molang/`）按 GPL-2.0 授权（见 LICENSE），
+与素材的 CC BY-NC-SA 4.0 是**分组件授权**，请勿混用。
+
+Copyright (c) 2019-2026 tartaric_acid, for the assets part

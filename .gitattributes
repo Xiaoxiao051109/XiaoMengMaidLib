@@ -1,0 +1,13 @@
+* text=auto
+
+# 二进制资源与构建产物
+*.jar binary
+*.DAT binary
+*.nbt binary
+*.png binary
+*.ogg binary
+*.bbmodel binary
+
+# 跨平台脚本换行
+gradlew text eol=lf
+*.bat text eol=crlf
