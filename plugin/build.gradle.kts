@@ -83,7 +83,7 @@ val generateContent = tasks.register<JavaExec>("generateContent") {
     val manifest = convertedModelsDir.get().file("tlm_models.json").asFile
     dependsOn(convertModels)
     inputs.file(manifest)
-    args(assets.absolutePath, data.absolutePath, output.absolutePath, manifest.absolutePath)
+    args(assets.absolutePath, data.absolutePath, output.absolutePath, manifest.absolutePath, project.version.toString())
     jvmArgs("-Dstdout.encoding=UTF-8", "-Dstderr.encoding=UTF-8")
 }
 
