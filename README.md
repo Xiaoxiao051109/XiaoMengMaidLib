@@ -11,6 +11,13 @@
 付费闭源的核心包 `XiaoMengMaid` 通过 Bukkit ServicesManager 与
 `<本插件数据目录>/runtime/` 数据契约消费本包，两者**缺一不可**。
 
+## 兼容性
+
+- 服务端：Paper / Folia **26.1.2 / 26.2 / 26.3**（`api-version: 26.1.2`，单包通用）
+- 核心包：`XiaoMengMaid` 需选择对应 `-mc26.1.2 / -mc26.2 / -mc26.3` 的构建
+- 依赖：CraftEngine 26.9.2、BetterModel 3.6.0、Java 25
+
+
 ## 许可（分组件）
 
 | 组件 | 许可 |

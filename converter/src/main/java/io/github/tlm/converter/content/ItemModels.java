@@ -48,17 +48,17 @@ final class ItemModels {
                 }
                 yield out;
             }
-            case "minecraft:special" -> staticIcon(gen, id);
+            case "minecraft:special" -> staticIcon(gen, id, null);
             default -> {
                 gen.warn(id + ": 不支持的物品模型类型 " + type + "，回退为静态图标");
-                yield staticIcon(gen, id);
+                yield staticIcon(gen, id, null);
             }
         };
     }
 
     /** 为客户端专属渲染的物品生成一张平面图标模型。 */
-    private static JsonElement staticIcon(ContentPackGenerator gen, String id) throws IOException {
-        String texture = switch (id) {
+    static JsonElement staticIcon(ContentPackGenerator gen, String id, String textureOverride) throws IOException {
+        String texture = textureOverride != null ? textureOverride : switch (id) {
             case "chair" -> "item/change_chair_model";
             case "garage_kit" -> "item/entity_placeholder";
             default -> "item/" + id;

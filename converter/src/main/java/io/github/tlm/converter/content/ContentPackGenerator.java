@@ -191,10 +191,15 @@ public final class ContentPackGenerator {
     JsonElement itemModel(String id) throws IOException {
         Path def = assets.resolve("items").resolve(id + ".json");
         if (!Files.isRegularFile(def)) {
-            if (!FurnitureTable.NO_ITEM_DEFINITION.contains(id)) {
-                warn(id + ": 缺少 items/" + id + ".json，回退为 item/" + id);
+            // 祭坛有专门写的空模型（手里看不到东西），不要用占位图标覆盖
+            if ("altar".equals(id)) {
+                return new com.google.gson.JsonPrimitive(NS + ":item/altar");
             }
-            return new com.google.gson.JsonPrimitive(NS + ":item/" + id);
+            // 椅子/家具物品在原模组里是代码注册的，没有 items/<id>.json；
+            // 生成一张统一的占位图标，避免 CE 报「缺少模型文件」
+            String texture = hasTexture("item/change_chair_model")
+                    ? "item/change_chair_model" : "item/entity_placeholder";
+            return ItemModels.staticIcon(this, id, texture);
         }
         return ItemModels.convert(this, id, readJson(def).getAsJsonObject("model"));
     }
