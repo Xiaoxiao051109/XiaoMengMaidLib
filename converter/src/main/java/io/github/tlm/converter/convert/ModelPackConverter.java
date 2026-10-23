@@ -230,6 +230,15 @@ public final class ModelPackConverter {
         JsonArray hiddenJson = new JsonArray();
         writer.hiddenBones().forEach(hiddenJson::add);
         entry.add("hidden_bones", hiddenJson);
+        // hidden_bones 是「有效隐藏」（含祖先继承）；self_hidden_bones 只含自身被脚本隐藏的骨骼，
+        // 运行时才能在祖先恢复显示时把只被继承隐藏的子部件重新显示。
+        JsonArray selfHiddenJson = new JsonArray();
+        writer.selfHiddenBones().forEach(selfHiddenJson::add);
+        entry.add("self_hidden_bones", selfHiddenJson);
+        // 同名骨骼去重改名表：运行时程序化动画按原名取骨骼，需要映射到实际 id。
+        JsonObject aliasesJson = new JsonObject();
+        writer.boneAliases().forEach(aliasesJson::addProperty);
+        entry.add("bone_aliases", aliasesJson);
         // 关键帧里被折算成常量的 Molang 引用，运行时需要用程序化动画补回
         JsonArray replacedJson = new JsonArray();
         writer.replacedMolang().forEach(replacedJson::add);

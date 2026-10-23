@@ -47,14 +47,43 @@ public final class BbModelWriter {
     private final MolangNormalizer molang = new MolangNormalizer();
 
     /**
-     * 初始应隐藏的骨骼名。BetterModel 3.5.0 运行时不会把 bbmodel 的 group visibility 应用到 display 上
-     * （实测 cirno 隐藏 0 个），所以这份列表写进清单，由插件生成模型后主动隐藏。
+     * 初始应隐藏的骨骼名（有效隐藏）。BetterModel 3.5.0 运行时不会把 bbmodel 的 group visibility 应用到
+     * display 上（实测 cirno 隐藏 0 个），所以这份列表写进清单，由插件生成模型后主动隐藏。
+     * 这里包含「自身被脚本隐藏」与「祖先被隐藏后继承」两种情况。
      */
     private final List<String> hiddenBones = new java.util.ArrayList<>();
+
+    /**
+     * 自身被脚本隐藏的骨骼 id（不含祖先继承）。运行时祖先恢复显示时，需要据此把只被继承隐藏的
+     * 子部件重新显示（例如挂在 {@code chestPlate} 下的第二张脸）。
+     */
+    private final List<String> selfHiddenBones = new java.util.ArrayList<>();
+
+    /** 同名骨骼去重改名表：原名 → 实际 id（只记录发生改名的项），运行时按它把动画骨骼名映射到实际骨骼。 */
+    private final Map<String, String> boneAliases = new LinkedHashMap<>();
 
     public List<String> hiddenBones() {
         return hiddenBones;
     }
+
+    public List<String> selfHiddenBones() {
+        return selfHiddenBones;
+    }
+
+    public Map<String, String> boneAliases() {
+        return boneAliases;
+    }
+
+    /**
+     * 状态贴片前移量（模型像素）。眨眼/受伤/祈求/睡觉等贴片是零厚度平面，与脸面只差 0.001 像素：
+     * 原版整模型同一矩阵绘制不会深度冲突；BetterModel 每根骨骼是独立 display 实体并逐骨插值，
+     * 该间隙会被插值/浮点误差吃掉，表现为闭眼贴片与脸上眼睛互穿。沿模型 -Z 前移固定量规避。
+     */
+    static final float OVERLAY_Z_OFFSET = 0.05f;
+
+    /** 需要前移的状态贴片骨骼（小写）。只处理零厚度平面立方体，避免误伤护甲/背包等实体部件。 */
+    private static final java.util.Set<String> OVERLAY_BONES = java.util.Set.of(
+            "blink", "blink2", "_blink", "_bink", "hurtblink", "begshow", "sleepshow");
 
     /** 本模型里被替换为常量的 Molang 引用（如 {@code ysm.head_yaw}），需要运行时程序化补回。 */
     public java.util.Set<String> replacedMolang() {
@@ -135,12 +164,21 @@ public final class BbModelWriter {
             ids[i] = count == 1 ? name : name + "_" + count;
             lastIdByName.put(name, ids[i]);
         }
+        for (Map.Entry<String, Integer> entry : seen.entrySet()) {
+            if (entry.getValue() > 1) {
+                boneAliases.put(entry.getKey(), lastIdByName.get(entry.getKey()));
+            }
+        }
         for (Map.Entry<String, String> entry : lastIdByName.entrySet()) {
             boneUuids.put(entry.getKey(), uuid("group:" + entry.getValue()));
         }
 
         boolean[] visible = effectiveVisibility(bones, ids, lastIdByName);
         for (int i = 0; i < ids.length; i++) {
+            boolean self = DefaultVisibility.visible(bones.get(i).name(), scripts);
+            if (!self) {
+                selfHiddenBones.add(ids[i]);
+            }
             if (!visible[i]) {
                 hiddenBones.add(ids[i]);
             }
@@ -156,18 +194,25 @@ public final class BbModelWriter {
             JsonObject node = outlinerNode(groupUuid);
             JsonArray children = node.getAsJsonArray("children");
             int index = 0;
+            boolean overlayBone = OVERLAY_BONES.contains(bone.name().toLowerCase(java.util.Locale.ROOT));
             for (BedrockGeometry.Cube cube : bone.cubes()) {
                 String cubeName = ids[i] + "#" + index++;
+                // 状态贴片（零厚度平面）与脸面共面，沿模型 -Z 前移固定量，避免独立 display 实体的深度冲突。
+                boolean overlay = overlayBone && isFlat(cube);
                 if (cube.rotation() != null && !isZero(cube.rotation())) {
                     float[] pivot = cube.pivot() != null ? cube.pivot() : bone.pivot();
+                    if (overlay) {
+                        // 带自身旋转的立方体几何与旋转点一起前移，保证贴片绕正确枢轴旋转。
+                        pivot = new float[]{pivot[0], pivot[1], pivot[2] - OVERLAY_Z_OFFSET};
+                    }
                     String wrapperUuid = uuid("group:" + cubeName);
                     // 子骨骼名带前缀，避免与模型自身骨骼重名，也让动画名查找不会误中
                     groups.add(group(wrapperUuid, "tlmcube_" + sanitize(cubeName), pivot, cube.rotation(), visible[i]));
                     JsonObject wrapper = outlinerNode(wrapperUuid);
-                    wrapper.getAsJsonArray("children").add(cube(elements, cubeName, cube, pivot));
+                    wrapper.getAsJsonArray("children").add(cube(elements, cubeName, cube, pivot, overlay));
                     children.add(wrapper);
                 } else {
-                    children.add(cube(elements, cubeName, cube, bone.pivot()));
+                    children.add(cube(elements, cubeName, cube, bone.pivot(), overlay));
                 }
             }
             nodes.put(ids[i], node);
@@ -294,8 +339,12 @@ public final class BbModelWriter {
 
     // ---------------------------------------------------------------- 立方体
 
-    /** 写入一个立方体元素并返回其 uuid（outliner 用 uuid 字符串引用元素）。 */
-    private String cube(JsonArray elements, String name, BedrockGeometry.Cube cube, float[] origin) {
+    /**
+     * 写入一个立方体元素并返回其 uuid（outliner 用 uuid 字符串引用元素）。
+     *
+     * @param overlay 状态贴片：几何沿模型 -Z 前移 {@link #OVERLAY_Z_OFFSET}，避免与脸面共面
+     */
+    private String cube(JsonArray elements, String name, BedrockGeometry.Cube cube, float[] origin, boolean overlay) {
         float[] o = cube.origin();
         float[] s = cube.size();
         String uuid = uuid("cube:" + name);
@@ -310,6 +359,11 @@ public final class BbModelWriter {
         // 所以先按各轴取最小/最大值得到规范的 [from, to]。
         float[] from = {-Math.max(o[0], o[0] + s[0]), Math.min(o[1], o[1] + s[1]), Math.min(o[2], o[2] + s[2])};
         float[] to = {-Math.min(o[0], o[0] + s[0]), Math.max(o[1], o[1] + s[1]), Math.max(o[2], o[2] + s[2])};
+        if (overlay) {
+            // 模型前向为 -Z；从/到一起前移保持零厚度与 UV 不变。
+            from[2] -= OVERLAY_Z_OFFSET;
+            to[2] -= OVERLAY_Z_OFFSET;
+        }
         element.add("from", vec(from[0], from[1], from[2]));
         element.add("to", vec(to[0], to[1], to[2]));
         element.add("origin", vec(-origin[0], origin[1], origin[2]));
@@ -319,6 +373,11 @@ public final class BbModelWriter {
         element.add("faces", cube.faceUv() != null ? perFaceUv(cube) : boxUv(cube));
         elements.add(element);
         return uuid;
+    }
+
+    /** 零厚度平面（z 尺寸为 0）：只有这类状态贴片需要前移。 */
+    private static boolean isFlat(BedrockGeometry.Cube cube) {
+        return Math.abs(cube.size()[2]) < 1.0e-4f;
     }
 
     /**
