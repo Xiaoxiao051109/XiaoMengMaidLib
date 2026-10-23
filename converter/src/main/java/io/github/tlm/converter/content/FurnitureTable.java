@@ -36,6 +36,8 @@ final class FurnitureTable {
         for (String color : new String[]{"pink", "white", "black", "yellow", "blue", "green", "purple"}) {
             BEDROCK.put(color + "_maid_bed", new String[]{"block/maid_bed/" + color, "block/maid_bed/" + color});
         }
+        // 旧版通用 maid_bed（颜色由 NBT 记录）现在以粉色床家具作为默认外观。
+        BEDROCK.put("maid_bed", new String[]{"block/maid_bed/pink", "block/maid_bed/pink"});
         for (String block : new String[]{"shrine", "snack_cabinet", "keyboard", "bookshelf", "computer",
                 "gomoku", "cchess", "wchess"}) {
             BEDROCK.put(block, new String[]{"block/" + block, "block/" + block});
@@ -87,7 +89,7 @@ final class FurnitureTable {
             JsonArray boxes = board != null ? BoardTable.hitboxes(board)
                     : JoyTable.isJoy(id) ? new JsonArray()
                     : id.equals(ALTAR) ? new JsonArray()
-                    : id.endsWith("_maid_bed") ? bedHitboxes(bounds) : hitboxes(gen, id, bounds);
+                    : id.endsWith("_maid_bed") || "maid_bed".equals(id) ? bedHitboxes(bounds) : hitboxes(gen, id, bounds);
             // 棋盘的座位仍由 JoyTable 提供（女仆要坐在棋盘旁），但碰撞/点击箱已自带，
             // 所以不再走 JoyTable 的碰撞箱生成
             items.add(ContentPackGenerator.id(id), furniture(gen, id, elements, boxes,

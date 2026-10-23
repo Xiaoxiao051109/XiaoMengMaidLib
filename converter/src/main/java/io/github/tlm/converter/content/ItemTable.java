@@ -38,6 +38,7 @@ final class ItemTable {
             "broom", "chair", "chair_show", "entity_id_copy", "favorability_tool_add", "favorability_tool_reduce",
             "favorability_tool_full", "film", "red_fox_scroll", "white_fox_scroll", "garage_kit", "kappa_compass",
             "maid_backpack_small", "maid_backpack_middle", "maid_backpack_big", "maid_beacon",
+            "crafting_table_backpack", "ender_chest_backpack", "furnace_backpack", "tank_backpack", "maid_bed",
             "pink_maid_bed", "white_maid_bed", "black_maid_bed", "yellow_maid_bed", "blue_maid_bed",
             "green_maid_bed", "purple_maid_bed", "model_switcher", "item_magnet_bauble", "mute_bauble", "photo",
             "owner_conversion_tool", "picnic_basket", "servant_bell", "smart_slab_init", "smart_slab_empty",
@@ -50,7 +51,8 @@ final class ItemTable {
     private static final Set<String> CATEGORY_ITEMS = Set.of(
             "maid_spawn_egg", "fairy_spawn_egg", "hakurei_gohei", "sanae_gohei", "power_point",
             "smart_slab_empty", "smart_slab_init", "maid_backpack_small", "maid_backpack_middle",
-            "maid_backpack_big", "substitute_jizo", "ultramarine_orb_elixir", "explosion_protect_bauble",
+            "maid_backpack_big", "crafting_table_backpack", "ender_chest_backpack", "furnace_backpack",
+            "tank_backpack", "maid_bed", "substitute_jizo", "ultramarine_orb_elixir", "explosion_protect_bauble",
             "fire_protect_bauble", "projectile_protect_bauble", "magic_protect_bauble", "fall_protect_bauble",
             "drown_protect_bauble", "nimble_fabric", "item_magnet_bauble", "mute_bauble", "wireless_io",
             "trumpet", "red_fox_scroll", "white_fox_scroll", "servant_bell", "kappa_compass", "extinguisher",
@@ -60,6 +62,10 @@ final class ItemTable {
             "green_maid_bed", "purple_maid_bed", "picnic_basket", "maid_beacon", "snack_cabinet", "shrine",
             "model_switcher", "chair_show", "broom", "scarecrow", "entity_id_copy", "owner_conversion_tool",
             "chair", "garage_kit");
+
+    /** 原模组有贴图/物品模型、但没有 items/<id>.json 定义的特殊物品。 */
+    private static final Set<String> EXTRA_ITEMS = Set.of(
+            "crafting_table_backpack", "ender_chest_backpack", "furnace_backpack", "tank_backpack");
 
     private static final Map<String, String> RARITY = Map.of(
             "favorability_tool_add", "epic",
@@ -86,6 +92,12 @@ final class ItemTable {
                 if (CATEGORY_ITEMS.contains(id)) {
                     gen.addCategoryItem(id);
                 }
+            }
+        }
+        for (String id : EXTRA_ITEMS) {
+            if (!out.has(ContentPackGenerator.id(id))) {
+                out.add(ContentPackGenerator.id(id), item(gen, id));
+                gen.addCategoryItem(id);
             }
         }
     }
