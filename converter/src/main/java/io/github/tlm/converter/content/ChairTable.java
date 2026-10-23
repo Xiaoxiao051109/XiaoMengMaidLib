@@ -136,6 +136,8 @@ final class ChairTable {
         furniture.add("settings", settings);
         furniture.add("variants", variants);
         furniture.add("loot", loot);
+        furniture.add("behaviors", FurnitureBehaviorConfig.list(
+                FurnitureBehaviorConfig.seat("", chair.displayName(), chair.mountedHeight(), 0, 0, true)));
 
         JsonObject groundRule = new JsonObject();
         groundRule.addProperty("rotation", "any");

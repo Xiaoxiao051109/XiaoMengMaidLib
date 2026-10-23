@@ -91,7 +91,7 @@ final class FurnitureTable {
             // 棋盘的座位仍由 JoyTable 提供（女仆要坐在棋盘旁），但碰撞/点击箱已自带，
             // 所以不再走 JoyTable 的碰撞箱生成
             items.add(ContentPackGenerator.id(id), furniture(gen, id, elements, boxes,
-                    board == null && JoyTable.isJoy(id) ? JoyTable.joy(id) : null));
+                    JoyTable.joy(id), board));
             if (!id.equals(ALTAR)) {
                 gen.addCategoryItem(id);
             }
@@ -113,7 +113,7 @@ final class FurnitureTable {
             }
             // Java 方块模型家具都是整格方块：每格一只边长 1 的潜影贝
             JsonArray boxes = cubeGrid(gen, id, 0, 0, 0, 1, entry.getValue().size(), 1);
-            items.add(ContentPackGenerator.id(id), furniture(gen, id, elements, boxes, null));
+            items.add(ContentPackGenerator.id(id), furniture(gen, id, elements, boxes, null, null));
             gen.addCategoryItem(id);
         }
     }
@@ -262,17 +262,17 @@ final class FurnitureTable {
 
     private static JsonObject furniture(ContentPackGenerator gen, String id, JsonArray elements, JsonArray hitboxes)
             throws IOException {
-        return furniture(gen, id, elements, hitboxes, null);
+        return furniture(gen, id, elements, hitboxes, null, null);
     }
 
     private static JsonObject furniture(ContentPackGenerator gen, String id, JsonArray elements, JsonArray hitboxes,
-                                        JoyTable.Joy joy) throws IOException {
+                                        JoyTable.Joy joy, BoardTable.Board board) throws IOException {
         JsonObject item = ItemTable.item(gen, id);
 
         JsonObject ground = new JsonObject();
         ground.add("elements", elements);
         ground.add("hitboxes", hitboxes);
-        if (joy != null) {
+        if (joy != null && board == null) {
             // 娱乐家具（五子棋、书架、电脑……）：再加一个带座位的交互碰撞箱，玩家右键坐上去
             JoyTable.addSeat(ground, joy);
         }
@@ -291,9 +291,14 @@ final class FurnitureTable {
         JsonObject furniture = new JsonObject();
         furniture.add("settings", settings);
         furniture.add("variants", variants);
-        // 祭坛只由插件放置 / 移除，不掉落物品
         if (!id.equals(ALTAR)) {
             furniture.add("loot", loot);
+        }
+        JsonObject seatBehavior = joy == null ? null : FurnitureBehaviorConfig.seat(
+                joy.joyType(), null, joy.sit()[1], joy.yRot(), joy.seatOut(), false);
+        JsonObject boardBehavior = board == null ? null : FurnitureBehaviorConfig.board(board);
+        if (seatBehavior != null || boardBehavior != null) {
+            furniture.add("behaviors", FurnitureBehaviorConfig.list(seatBehavior, boardBehavior));
         }
 
         // 原模组方块按玩家朝向四向放置
