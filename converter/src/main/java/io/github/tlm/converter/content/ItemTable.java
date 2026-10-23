@@ -127,14 +127,34 @@ final class ItemTable {
         JsonObject item = new JsonObject();
         item.add("data", data);
         item.add("model", gen.itemModel(id));
-        if (id.endsWith("_maid_bed")) {
-            // 床染色配方以 #touhou_little_maid:maid_bed 作原料
+        com.google.gson.JsonArray tags = itemTags(id);
+        if (!tags.isEmpty()) {
             JsonObject settings = new JsonObject();
-            com.google.gson.JsonArray tags = new com.google.gson.JsonArray();
-            tags.add(ContentPackGenerator.id("maid_bed"));
             settings.add("tags", tags);
             item.add("settings", settings);
         }
         return item;
+    }
+
+    /** 物品分类标签：背包容量/特殊背包、床，供 A 读取 CE tags，不再靠 id 列表识别。 */
+    private static com.google.gson.JsonArray itemTags(String id) {
+        com.google.gson.JsonArray tags = new com.google.gson.JsonArray();
+        switch (id) {
+            case "maid_backpack_small" -> tags.add(ContentPackGenerator.id("backpack_small"));
+            case "maid_backpack_middle" -> tags.add(ContentPackGenerator.id("backpack_middle"));
+            case "maid_backpack_big" -> tags.add(ContentPackGenerator.id("backpack_big"));
+            case "crafting_table_backpack", "ender_chest_backpack", "furnace_backpack", "tank_backpack" ->
+                    tags.add(ContentPackGenerator.id("backpack_special"));
+            default -> {
+            }
+        }
+        if (!tags.isEmpty()) {
+            tags.add(ContentPackGenerator.id("backpack"));
+        }
+        if ("maid_bed".equals(id) || id.endsWith("_maid_bed")) {
+            // 床染色配方与识别都使用 maid_bed 标签
+            tags.add(ContentPackGenerator.id("maid_bed"));
+        }
+        return tags;
     }
 }
