@@ -39,6 +39,10 @@ public final class XqwlightGame implements BoardGame {
     /** 命中容差：偏离交叉点超过这么多格就算没点中（{@code CChessUtil} 用 0.3）。 */
     private static final double CLICK_TOLERANCE = 0.3;
 
+    /** 搜索器哈希表较大，按线程复用，避免每次 think 重新创建 4096 个 HashItem。 */
+    private static final ThreadLocal<Search> SEARCH = ThreadLocal.withInitial(
+            () -> new Search(new Position(), HASH_LEVEL));
+
     public XqwlightGame() {
     }
 
@@ -185,7 +189,9 @@ public final class XqwlightGame implements BoardGame {
     public Move think(String fen, long thinkingMillis) {
         Position position = position(fen);
         String before = fen;
-        int move = new Search(position, HASH_LEVEL).searchMain((int) Math.max(1, thinkingMillis));
+        Search search = SEARCH.get();
+        search.reset(position);
+        int move = search.searchMain((int) Math.max(1, thinkingMillis));
         if (move == 0) {
             return null;
         }

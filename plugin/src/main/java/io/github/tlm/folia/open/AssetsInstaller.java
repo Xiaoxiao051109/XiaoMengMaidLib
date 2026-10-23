@@ -74,7 +74,7 @@ public final class AssetsInstaller {
             }
             Files.createDirectories(target);
             try (Stream<Path> walk = Files.walk(source)) {
-                for (Path entry : walk.toList()) {
+                for (Path entry : (Iterable<Path>) walk::iterator) {
                     Path relative = source.relativize(entry);
                     Path destination = target.resolve(relative.toString());
                     if (Files.isDirectory(entry)) {

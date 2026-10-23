@@ -48,6 +48,11 @@ public class Search {
         }
     }
 
+    /** 复用一个 Search 实例：只替换局面，哈希表由 searchMain 自己清零。 */
+    public void reset(Position pos) {
+        this.pos = pos;
+    }
+
     private HashItem getHashItem() {
         return hashTable[pos.zobristKey & hashMask];
     }
