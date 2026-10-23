@@ -143,8 +143,10 @@ final class ItemTable {
             case "maid_backpack_small" -> tags.add(ContentPackGenerator.id("backpack_small"));
             case "maid_backpack_middle" -> tags.add(ContentPackGenerator.id("backpack_middle"));
             case "maid_backpack_big" -> tags.add(ContentPackGenerator.id("backpack_big"));
-            case "crafting_table_backpack", "ender_chest_backpack", "furnace_backpack", "tank_backpack" ->
-                    tags.add(ContentPackGenerator.id("backpack_special"));
+            case "crafting_table_backpack" -> tags.add(ContentPackGenerator.id("backpack_crafting_table"));
+            case "ender_chest_backpack" -> tags.add(ContentPackGenerator.id("backpack_ender_chest"));
+            case "furnace_backpack" -> tags.add(ContentPackGenerator.id("backpack_furnace"));
+            case "tank_backpack" -> tags.add(ContentPackGenerator.id("backpack_tank"));
             default -> {
             }
         }
