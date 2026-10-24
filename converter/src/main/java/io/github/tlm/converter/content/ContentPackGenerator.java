@@ -72,7 +72,7 @@ public final class ContentPackGenerator {
      * CE 物品定义还包含家具内部的 display、棋子和椅子模型变体；这些定义必须保留供家具渲染，
      * 但不能自动出现在玩家可获取的物品菜单里。分类只收集各生成表明确标记的公开物品。
      */
-    private final Set<String> categoryItems = new java.util.TreeSet<>();
+    private final Map<String, Set<String>> categoryItems = new LinkedHashMap<>();
 
     /**
      * @param assets 原模组 {@code assets/touhou_little_maid}
@@ -354,24 +354,34 @@ public final class ContentPackGenerator {
     }
 
     /** 把一个确实面向玩家的物品加入 CE 菜单；内部 display/model 定义不要调用此方法。 */
-    void addCategoryItem(String path) {
-        this.categoryItems.add(id(path));
+    void addCategoryItem(String category, String path) {
+        this.categoryItems.computeIfAbsent(category, key -> new java.util.TreeSet<>()).add(id(path));
     }
 
-    /** 创造模式式的物品分类：只列出玩家可获取的物品，内部渲染定义仍保留在 items.yml。 */
+    /** 创造模式式的物品分类：按要求分组，只列出玩家可获取的物品，内部渲染定义仍保留在 items.yml。 */
     private void writeCategory() throws IOException {
-        JsonArray list = new JsonArray();
-        this.categoryItems.forEach(list::add);
-        JsonObject category = new JsonObject();
-        category.addProperty("priority", 10);
-        category.addProperty("name", "<!i><#F7A8C4>XiaoMengMaid");
-        category.addProperty("icon", NS + ":hakurei_gohei");
-        category.add("list", list);
         JsonObject categories = new JsonObject();
-        categories.add(NS + ":all", category);
+        category(categories, "maid", "女仆", "maid_spawn_egg", 10);
+        category(categories, "bauble", "饰品", "ultramarine_orb_elixir", 20);
+        category(categories, "game", "娱乐与棋盘", "gomoku", 30);
+        category(categories, "furniture", "家具与装饰", "chair", 40);
+        category(categories, "model", "模型与展示", "model_switcher", 50);
+        category(categories, "admin", "管理与工具", "favorability_tool_full", 60);
+        category(categories, "misc", "其他", "film", 70);
         JsonObject root = new JsonObject();
         root.add("categories", categories);
         writeConfig("categories.yml", root);
+    }
+
+    private void category(JsonObject categories, String key, String display, String icon, int priority) {
+        JsonArray list = new JsonArray();
+        this.categoryItems.getOrDefault(key, Set.of()).forEach(list::add);
+        JsonObject category = new JsonObject();
+        category.addProperty("priority", priority);
+        category.addProperty("name", "<!i><#F7A8C4>" + display);
+        category.addProperty("icon", id(icon));
+        category.add("list", list);
+        categories.add(NS + ":" + key, category);
     }
 
     static JsonObject readJson(Path path) throws IOException {

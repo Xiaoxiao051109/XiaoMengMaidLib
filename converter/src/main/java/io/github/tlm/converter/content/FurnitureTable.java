@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 可放置物品 → CraftEngine 家具。
@@ -95,7 +96,7 @@ final class FurnitureTable {
             items.add(ContentPackGenerator.id(id), furniture(gen, id, elements, boxes,
                     JoyTable.joy(id), board));
             if (!id.equals(ALTAR)) {
-                gen.addCategoryItem(id);
+                gen.addCategoryItem(categoryOf(id), id);
             }
         }
 
@@ -116,7 +117,7 @@ final class FurnitureTable {
             // Java 方块模型家具都是整格方块：每格一只边长 1 的潜影贝
             JsonArray boxes = cubeGrid(gen, id, 0, 0, 0, 1, entry.getValue().size(), 1);
             items.add(ContentPackGenerator.id(id), furniture(gen, id, elements, boxes, null, null));
-            gen.addCategoryItem(id);
+            gen.addCategoryItem("furniture", id);
         }
     }
 
@@ -334,4 +335,18 @@ final class FurnitureTable {
     private static float round(float value) {
         return Math.round(value * 1000f) / 1000f;
     }
+
+    /** 家具分类：床归女仆，棋盘/娱乐家具归娱乐，其余归家具。 */
+    private static String categoryOf(String id) {
+        if ("maid_bed".equals(id) || id.endsWith("_maid_bed")) {
+            return "maid";
+        }
+        if (JOY_CATEGORY.contains(id)) {
+            return "game";
+        }
+        return "furniture";
+    }
+
+    private static final Set<String> JOY_CATEGORY = Set.of(
+            "gomoku", "cchess", "wchess", "bookshelf", "computer", "keyboard", "picnic_basket", "picnic_mat");
 }

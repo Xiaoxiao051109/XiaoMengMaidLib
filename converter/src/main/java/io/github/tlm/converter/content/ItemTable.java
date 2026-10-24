@@ -47,21 +47,34 @@ final class ItemTable {
             "change_chair_model", "change_maid_model", "maid_100_healthy", "kill_100", "kill_slime_300",
             "all_netherite_equipment", "kill_wither", "kill_dragon", "tacz_gun_icon");
 
-    /** 原模组主创造标签与附加家具标签中的公开物品；其它资源物品只供配方/内部显示使用。 */
-    private static final Set<String> CATEGORY_ITEMS = Set.of(
-            "maid_spawn_egg", "fairy_spawn_egg", "hakurei_gohei", "sanae_gohei", "power_point",
-            "smart_slab_empty", "smart_slab_init", "maid_backpack_small", "maid_backpack_middle",
-            "maid_backpack_big", "crafting_table_backpack", "ender_chest_backpack", "furnace_backpack",
-            "tank_backpack", "maid_bed", "substitute_jizo", "ultramarine_orb_elixir", "explosion_protect_bauble",
-            "fire_protect_bauble", "projectile_protect_bauble", "magic_protect_bauble", "fall_protect_bauble",
-            "drown_protect_bauble", "nimble_fabric", "item_magnet_bauble", "mute_bauble", "wireless_io",
-            "trumpet", "red_fox_scroll", "white_fox_scroll", "servant_bell", "kappa_compass", "extinguisher",
-            "gomoku", "cchess", "wchess", "keyboard", "bookshelf", "computer", "favorability_tool_add",
-            "favorability_tool_reduce", "favorability_tool_full", "camera", "photo", "film", "chisel",
-            "pink_maid_bed", "white_maid_bed", "black_maid_bed", "yellow_maid_bed", "blue_maid_bed",
-            "green_maid_bed", "purple_maid_bed", "picnic_basket", "maid_beacon", "snack_cabinet", "shrine",
-            "model_switcher", "chair_show", "broom", "scarecrow", "entity_id_copy", "owner_conversion_tool",
-            "chair", "garage_kit");
+    /**
+     * 公开物品到 CE 分类的映射；家具物品由 FurnitureTable 归类。
+     * 未列出的资源/内部物品不会进入创造菜单。
+     */
+    private static final Map<String, Set<String>> CATEGORY_ITEMS = Map.of(
+            "maid", Set.of(
+                    "maid_spawn_egg", "fairy_spawn_egg", "hakurei_gohei", "sanae_gohei", "power_point",
+                    "smart_slab_empty", "smart_slab_init", "smart_slab_has_maid", "maid_backpack_small",
+                    "maid_backpack_middle", "maid_backpack_big", "crafting_table_backpack", "ender_chest_backpack",
+                    "furnace_backpack", "tank_backpack", "film", "extinguisher", "substitute_jizo"),
+            "bauble", Set.of(
+                    "ultramarine_orb_elixir", "explosion_protect_bauble", "fire_protect_bauble",
+                    "projectile_protect_bauble", "magic_protect_bauble", "fall_protect_bauble",
+                    "drown_protect_bauble", "nimble_fabric", "item_magnet_bauble", "mute_bauble", "wireless_io"),
+            "model", Set.of(
+                    "camera", "photo", "chisel", "garage_kit", "model_switcher", "chair_show",
+                    "change_maid_model", "change_chair_model"),
+            "admin", Set.of(
+                    "favorability_tool_add", "favorability_tool_reduce", "favorability_tool_full",
+                    "owner_conversion_tool", "entity_id_copy", "monster_list",
+                    "maid_100_healthy", "kill_100", "kill_slime_300", "kill_wither", "kill_dragon",
+                    "all_netherite_equipment", "tacz_gun_icon"),
+            "misc", Set.of(
+                    "broom", "trumpet", "red_fox_scroll", "white_fox_scroll", "servant_bell", "kappa_compass",
+                    "maid_beacon", "snack_cabinet", "shrine", "scarecrow"));
+
+    private static final Set<String> EXTRA_CATEGORY_ITEMS = Set.of(
+            "crafting_table_backpack", "ender_chest_backpack", "furnace_backpack", "tank_backpack");
 
     /** 原模组有贴图/物品模型、但没有 items/<id>.json 定义的特殊物品。 */
     private static final Set<String> EXTRA_ITEMS = Set.of(
@@ -89,15 +102,16 @@ final class ItemTable {
                     continue;
                 }
                 out.add(ContentPackGenerator.id(id), item(gen, id));
-                if (CATEGORY_ITEMS.contains(id)) {
-                    gen.addCategoryItem(id);
+                String category = categoryOf(id);
+                if (category != null) {
+                    gen.addCategoryItem(category, id);
                 }
             }
         }
         for (String id : EXTRA_ITEMS) {
             if (!out.has(ContentPackGenerator.id(id))) {
                 out.add(ContentPackGenerator.id(id), item(gen, id));
-                gen.addCategoryItem(id);
+                gen.addCategoryItem("maid", id);
             }
         }
     }
@@ -158,5 +172,14 @@ final class ItemTable {
             tags.add(ContentPackGenerator.id("maid_bed"));
         }
         return tags;
+    }
+
+    private static String categoryOf(String id) {
+        for (Map.Entry<String, Set<String>> entry : CATEGORY_ITEMS.entrySet()) {
+            if (entry.getValue().contains(id)) {
+                return entry.getKey();
+            }
+        }
+        return null;
     }
 }
