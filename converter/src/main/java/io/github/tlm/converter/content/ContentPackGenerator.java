@@ -59,6 +59,13 @@ public final class ContentPackGenerator {
     static final String NS = "touhou_little_maid";
 
     private static final Gson GSON = new GsonBuilder().disableHtmlEscaping().setPrettyPrinting().create();
+    /** 原模组 26.x 资源里缺失的部分物品翻译：转换器补到资源包 en_us / zh_cn。 */
+    private static final Map<String, String[]> FALLBACK_NAMES = Map.of(
+            "ender_chest_backpack", new String[]{"Ender Chest Backpack", "末影箱背包"},
+            "crafting_table_backpack", new String[]{"Crafting Table Backpack", "工作台背包"},
+            "tank_backpack", new String[]{"Tank Backpack", "储罐背包"},
+            "furnace_backpack", new String[]{"Furnace Backpack", "熔炉背包"},
+            "maid_bed", new String[]{"Maid Bed", "女仆床"});
     private static final Gson COMPACT = new GsonBuilder().disableHtmlEscaping().create();
 
     private final Path assets;
@@ -238,6 +245,24 @@ public final class ContentPackGenerator {
         if (soundPack != null) {
             applySoundPack();
         }
+        applyFallbackLang();
+    }
+
+    private void applyFallbackLang() throws IOException {
+        for (String code : List.of("en_us", "zh_cn")) {
+            Path file = resourcepack.resolve("lang").resolve(code + ".json");
+            if (!Files.isRegularFile(file)) {
+                continue;
+            }
+            JsonObject json = readJson(file);
+            FALLBACK_NAMES.forEach((id, names) -> {
+                String key = "item." + NS + "." + id;
+                if (!json.has(key)) {
+                    json.addProperty(key, "zh_cn".equals(code) ? names[1] : names[0]);
+                }
+            });
+            Files.writeString(file, GSON.toJson(json), StandardCharsets.UTF_8);
+        }
     }
 
     private static void copyDir(Path from, Path to) throws IOException {
@@ -281,6 +306,9 @@ public final class ContentPackGenerator {
         String key = lang.has("item." + NS + "." + id) ? "item." + NS + "." + id
                 : lang.has("block." + NS + "." + id) ? "block." + NS + "." + id
                 : null;
+        if (key == null && FALLBACK_NAMES.containsKey(id)) {
+            key = "item." + NS + "." + id;
+        }
         if (key == null) {
             // 进度图标一类内部物品没有翻译键，直接用 id
             return "<!i>" + id;
@@ -300,6 +328,10 @@ public final class ContentPackGenerator {
             // 生成一张统一的占位图标，避免 CE 报「缺少模型文件」
             String texture = hasTexture("item/change_chair_model")
                     ? "item/change_chair_model" : "item/entity_placeholder";
+            if (FALLBACK_NAMES.containsKey(id) && !hasTexture("item/" + id)
+                    && hasTexture("item/maid_backpack_small")) {
+                texture = "item/maid_backpack_small";
+            }
             return ItemModels.staticIcon(this, id, texture);
         }
         return ItemModels.convert(this, id, readJson(def).getAsJsonObject("model"));
