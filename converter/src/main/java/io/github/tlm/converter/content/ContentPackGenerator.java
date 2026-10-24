@@ -66,6 +66,8 @@ public final class ContentPackGenerator {
     private final Path content;
     private final Path resourcepack;
     private final Path modelsOut;
+    /** 默认模型包根目录（touhou_little_maid-1.0.0），用于把内置女仆音效并入资源包；可为 null。 */
+    private final Path soundPack;
     private final JsonObject lang;
     private final List<String> warnings = new ArrayList<>();
     /**
@@ -80,8 +82,13 @@ public final class ContentPackGenerator {
      * @param out    输出根目录
      */
     public ContentPackGenerator(Path assets, Path data, Path out) throws IOException {
+        this(assets, data, out, null);
+    }
+
+    public ContentPackGenerator(Path assets, Path data, Path out, Path soundPack) throws IOException {
         this.assets = assets;
         this.data = data;
+        this.soundPack = soundPack;
         CURRENT_ASSETS = assets;
         this.content = out.resolve("content");
         this.resourcepack = content.resolve("resourcepack").resolve("assets").resolve(NS);
@@ -117,6 +124,97 @@ public final class ContentPackGenerator {
         writeCategory();
     }
 
+
+    /**
+     * 把默认模型包里的女仆音效并入资源包，并把 sounds.json 里原本指向 maid/empty 的事件
+     * 换成实际 ogg 变体。原模组靠客户端音效包替换，服务端重写没有客户端，只能静态打包。
+     */
+    private void applySoundPack() throws IOException {
+        Path source = soundPack.resolve("assets").resolve(NS).resolve("sounds").resolve("maid");
+        if (!Files.isDirectory(source)) {
+            warnings.add("缺少默认模型包女仆音效：" + source);
+            return;
+        }
+        Path target = resourcepack.resolve("sounds").resolve("maid");
+        copyDirectory(source, target);
+        Path jsonPath = resourcepack.resolve("sounds.json");
+        if (!Files.isRegularFile(jsonPath)) {
+            return;
+        }
+        JsonObject root = readJson(jsonPath);
+        Map<String, List<String>> variants = new LinkedHashMap<>();
+        List<String> idle = soundsUnder(source.resolve("mode"), "idle");
+        List<String> attack = soundsUnder(source.resolve("mode"), "attack");
+        List<String> feed = soundsUnder(source.resolve("mode"), "feed");
+        variants.put("maid.mode.idle", idle);
+        variants.put("maid.mode.attack", attack);
+        variants.put("maid.mode.range_attack", attack);
+        variants.put("maid.mode.danmaku_attack", attack);
+        variants.put("maid.mode.feed", feed);
+        variants.put("maid.mode.feed_animal", feed);
+        for (String reuse : List.of("farm", "shears", "milk", "torch", "extinguishing", "snow", "break", "furnace", "brewing")) {
+            variants.put("maid.mode." + reuse, idle);
+        }
+        variants.put("maid.ai.find_target", soundsUnder(source.resolve("ai"), "find_target"));
+        List<String> hurt = soundsUnder(source.resolve("ai"), "hurt");
+        variants.put("maid.ai.hurt", hurt);
+        variants.put("maid.ai.hurt_fire", hurt);
+        variants.put("maid.ai.hurt_player", soundsUnder(source.resolve("ai"), "hurt_player"));
+        variants.put("maid.ai.tamed", soundsUnder(source.resolve("ai"), "tamed"));
+        variants.put("maid.ai.item_get", soundsUnder(source.resolve("ai"), "item_get"));
+        variants.put("maid.ai.death", soundsUnder(source.resolve("ai"), "death"));
+        variants.put("maid.environment.cold", soundsUnder(source.resolve("environment"), "cold"));
+        variants.put("maid.environment.hot", soundsUnder(source.resolve("environment"), "hot"));
+        variants.put("maid.environment.rain", soundsUnder(source.resolve("environment"), "rain"));
+        variants.put("maid.environment.snow", soundsUnder(source.resolve("environment"), "snow"));
+        variants.put("maid.environment.morning", soundsUnder(source.resolve("environment"), "morning"));
+        variants.put("maid.environment.night", soundsUnder(source.resolve("environment"), "night"));
+        variants.put("maid.credit", soundsUnder(source.resolve("other"), "credit"));
+        variants.forEach((event, files) -> {
+            if (files.isEmpty()) {
+                return;
+            }
+            JsonObject entry = root.getAsJsonObject(event);
+            if (entry == null) {
+                entry = new JsonObject();
+                entry.addProperty("category", "neutral");
+                root.add(event, entry);
+            }
+            JsonArray sounds = new JsonArray();
+            files.forEach(sounds::add);
+            entry.add("sounds", sounds);
+        });
+        JsonObject sorted = new JsonObject();
+        root.keySet().stream().sorted().forEach(key -> sorted.add(key, root.get(key)));
+        Files.writeString(jsonPath, GSON.toJson(sorted), StandardCharsets.UTF_8);
+    }
+
+    private static List<String> soundsUnder(Path dir, String prefix) throws IOException {
+        if (!Files.isDirectory(dir)) {
+            return List.of();
+        }
+        try (Stream<Path> files = Files.list(dir)) {
+            return files.filter(path -> {
+                        String name = path.getFileName().toString();
+                        return name.endsWith(".ogg") && name.matches(prefix + "\\d*\\.ogg");
+                    })
+                    .sorted()
+                    .map(path -> NS + ":maid/" + dir.getFileName() + "/" + path.getFileName().toString().replace(".ogg", ""))
+                    .toList();
+        }
+    }
+
+    private static void copyDirectory(Path source, Path target) throws IOException {
+        try (Stream<Path> files = Files.walk(source)) {
+            for (Path file : files.filter(Files::isRegularFile).toList()) {
+                Path relative = source.relativize(file);
+                Path destination = target.resolve(relative);
+                Files.createDirectories(destination.getParent());
+                Files.copy(file, destination, StandardCopyOption.REPLACE_EXISTING);
+            }
+        }
+    }
+
     // ---------------------------------------------------------------- 资源复制
 
     private void writePackMeta() throws IOException {
@@ -136,6 +234,9 @@ public final class ContentPackGenerator {
         Path sounds = assets.resolve("sounds.json");
         if (Files.isRegularFile(sounds)) {
             Files.copy(sounds, resourcepack.resolve("sounds.json"), StandardCopyOption.REPLACE_EXISTING);
+        }
+        if (soundPack != null) {
+            applySoundPack();
         }
     }
 
@@ -421,7 +522,8 @@ public final class ContentPackGenerator {
         if (args.length >= 4) {
             MANIFEST = Path.of(args[3]);
         }
-        ContentPackGenerator generator = new ContentPackGenerator(Path.of(args[0]), Path.of(args[1]), Path.of(args[2]));
+        Path soundPack = args.length >= 6 ? Path.of(args[5]) : null;
+        ContentPackGenerator generator = new ContentPackGenerator(Path.of(args[0]), Path.of(args[1]), Path.of(args[2]), soundPack);
         generator.run();
         System.out.println("[内容包] 生成完成，警告 " + generator.warnings().size() + " 条");
         generator.warnings().forEach(w -> System.out.println("  - " + w));

@@ -76,14 +76,16 @@ val generateContent = tasks.register<JavaExec>("generateContent") {
     val assets = root.resolve("main/resources/assets/touhou_little_maid")
     val data = root.resolve("generated/resources/data/touhou_little_maid")
     val output = generatedContentDir.get().asFile
+    val soundPack = file(tlmPackDir.get())
     inputs.dir(assets)
     inputs.dir(data)
+    inputs.dir(soundPack.resolve("assets/touhou_little_maid/sounds/maid"))
     outputs.dir(output)
     doFirst { output.deleteRecursively() }
     val manifest = convertedModelsDir.get().file("tlm_models.json").asFile
     dependsOn(convertModels)
     inputs.file(manifest)
-    args(assets.absolutePath, data.absolutePath, output.absolutePath, manifest.absolutePath, project.version.toString())
+    args(assets.absolutePath, data.absolutePath, output.absolutePath, manifest.absolutePath, project.version.toString(), soundPack.absolutePath)
     jvmArgs("-Dstdout.encoding=UTF-8", "-Dstderr.encoding=UTF-8")
 }
 
