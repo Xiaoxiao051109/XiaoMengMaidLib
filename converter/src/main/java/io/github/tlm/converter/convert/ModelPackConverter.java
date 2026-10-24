@@ -227,6 +227,7 @@ public final class ModelPackConverter {
         keyframed.forEach(a -> keyframedNames.add(a.name()));
         geckoAnimations.keySet().forEach(keyframedNames::add);
         entry.add("keyframe_animations", keyframedNames);
+        entry.addProperty("baked_sleep", bakedSleep(geckoAnimations));
         JsonArray hiddenJson = new JsonArray();
         writer.hiddenBones().forEach(hiddenJson::add);
         entry.add("hidden_bones", hiddenJson);
@@ -247,6 +248,56 @@ public final class ModelPackConverter {
             replacedTotal += replacedJson.size();
         }
         manifest.add(entry);
+    }
+
+    /** sleep 动画是否已经把躺姿烘进 Root/AllBody/Body 的 X 旋转（YSM 模型）。 */
+    private static boolean bakedSleep(JsonObject animations) {
+        if (animations == null || !animations.has("sleep")) {
+            return false;
+        }
+        JsonObject sleep = animations.getAsJsonObject("sleep");
+        JsonObject bones = sleep.getAsJsonObject("bones");
+        if (bones == null) {
+            return false;
+        }
+        for (String name : new String[]{"Root", "AllBody", "Body"}) {
+            JsonObject bone = bones.getAsJsonObject(name);
+            if (bone == null || !bone.has("rotation")) {
+                continue;
+            }
+            com.google.gson.JsonElement rotation = bone.get("rotation");
+            if (rotation.isJsonArray() && rotation.getAsJsonArray().size() > 0) {
+                if (Math.abs(pitch(rotation.getAsJsonArray().get(0))) > 45.0) {
+                    return true;
+                }
+            } else if (rotation.isJsonObject()) {
+                for (var frame : rotation.getAsJsonObject().entrySet()) {
+                    com.google.gson.JsonElement value = frame.getValue();
+                    if (value.isJsonObject()) {
+                        value = value.getAsJsonObject().get("post");
+                    }
+                    if (value != null && value.isJsonArray() && value.getAsJsonArray().size() > 0
+                            && Math.abs(pitch(value.getAsJsonArray().get(0))) > 45.0) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    private static double pitch(com.google.gson.JsonElement element) {
+        if (element.isJsonPrimitive()) {
+            if (element.getAsJsonPrimitive().isNumber()) {
+                return element.getAsDouble();
+            }
+            var matcher = java.util.regex.Pattern.compile("^\\s*(-?\\d+(?:\\.\\d+)?)")
+                    .matcher(element.getAsString());
+            if (matcher.find()) {
+                return Double.parseDouble(matcher.group(1));
+            }
+        }
+        return 0.0;
     }
 
     /** BetterModel 模型键：只允许小写字母数字下划线，如 {@code tlm_maid_touhou_little_maid__cirno}。 */
