@@ -79,7 +79,7 @@ public final class BbModelWriter {
      * 原版整模型同一矩阵绘制不会深度冲突；BetterModel 每根骨骼是独立 display 实体并逐骨插值，
      * 该间隙会被插值/浮点误差吃掉，表现为闭眼贴片与脸上眼睛互穿。沿模型 -Z 前移固定量规避。
      */
-    static final float OVERLAY_Z_OFFSET = 0.05f;
+    static final float OVERLAY_Z_OFFSET = 0.20f;
 
     /** 需要前移的状态贴片骨骼（小写）。只处理零厚度平面立方体，避免误伤护甲/背包等实体部件。 */
     private static final java.util.Set<String> OVERLAY_BONES = java.util.Set.of(
