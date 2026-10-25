@@ -183,6 +183,16 @@ public final class BbModelWriter {
                 hiddenBones.add(ids[i]);
             }
         }
+        // 背篓模型带玩家参考网格；只保留背篓本体，避免在女仆背上渲染一个完整玩家。
+        if (modelName.contains("backpack")) {
+            for (String helper : List.of("player", "head", "body", "leftArm", "rightArm", "leftLeg", "rightLeg")) {
+                String helperId = lastIdByName.get(helper);
+                if (helperId != null) {
+                    selfHiddenBones.add(helperId);
+                    hiddenBones.add(helperId);
+                }
+            }
+        }
         // YSM 模型常用 M 前缀镜像/发光层（MRoot 下整套重复骨骼）；默认隐藏它，避免尾巴/衣服叠两层。
         if (lastIdByName.containsKey("MRoot") && lastIdByName.containsKey("Root")) {
             String mirrorRoot = lastIdByName.get("MRoot");
