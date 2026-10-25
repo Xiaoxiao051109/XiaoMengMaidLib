@@ -183,6 +183,16 @@ public final class BbModelWriter {
                 hiddenBones.add(ids[i]);
             }
         }
+        // YSM 模型常用 M 前缀镜像/发光层（MRoot 下整套重复骨骼）；默认隐藏它，避免尾巴/衣服叠两层。
+        if (lastIdByName.containsKey("MRoot") && lastIdByName.containsKey("Root")) {
+            String mirrorRoot = lastIdByName.get("MRoot");
+            if (!selfHiddenBones.contains(mirrorRoot)) {
+                selfHiddenBones.add(mirrorRoot);
+            }
+            if (!hiddenBones.contains(mirrorRoot)) {
+                hiddenBones.add(mirrorRoot);
+            }
+        }
 
         // 先为每根骨骼建好 outliner 节点，再按 parent 挂接；与 JSON 中的出现顺序无关
         Map<String, JsonObject> nodes = new LinkedHashMap<>();
