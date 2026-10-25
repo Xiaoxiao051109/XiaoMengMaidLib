@@ -60,9 +60,14 @@ val convertModels = tasks.register<JavaExec>("convertModels") {
     mainClass = "io.github.tlm.converter.convert.ModelPackConverter"
     val input = file(tlmPackDir.get())
     val output = convertedModelsDir.get().asFile
-    inputs.dir(input)
     outputs.dir(output)
-    args(input.absolutePath, output.absolutePath)
+    if (input.isDirectory) {
+        inputs.dir(input)
+        args(input.absolutePath, output.absolutePath)
+    } else {
+        logger.warn("TLM 默认模型包不存在，跳过 convertModels：${input.absolutePath}")
+        onlyIf { false }
+    }
     jvmArgs("-Dstdout.encoding=UTF-8", "-Dstderr.encoding=UTF-8")
     isIgnoreExitValue = true
 }
@@ -77,15 +82,21 @@ val generateContent = tasks.register<JavaExec>("generateContent") {
     val data = root.resolve("generated/resources/data/touhou_little_maid")
     val output = generatedContentDir.get().asFile
     val soundPack = file(tlmPackDir.get())
-    inputs.dir(assets)
-    inputs.dir(data)
-    inputs.dir(soundPack.resolve("assets/touhou_little_maid/sounds/maid"))
+    val soundAssets = soundPack.resolve("assets/touhou_little_maid/sounds/maid")
     outputs.dir(output)
-    doFirst { output.deleteRecursively() }
     val manifest = convertedModelsDir.get().file("tlm_models.json").asFile
     dependsOn(convertModels)
-    inputs.file(manifest)
-    args(assets.absolutePath, data.absolutePath, output.absolutePath, manifest.absolutePath, project.version.toString(), soundPack.absolutePath)
+    if (assets.isDirectory && data.isDirectory && soundAssets.isDirectory) {
+        inputs.dir(assets)
+        inputs.dir(data)
+        inputs.dir(soundAssets)
+        inputs.file(manifest)
+        doFirst { output.deleteRecursively() }
+        args(assets.absolutePath, data.absolutePath, output.absolutePath, manifest.absolutePath, project.version.toString(), soundPack.absolutePath)
+    } else {
+        logger.warn("TLM 源资源不完整，跳过 generateContent，复用现有生成目录：${generatedContentDir.get().asFile.absolutePath}")
+        onlyIf { false }
+    }
     jvmArgs("-Dstdout.encoding=UTF-8", "-Dstderr.encoding=UTF-8")
 }
 
