@@ -37,25 +37,26 @@ public final class AssetsInstaller {
         String version = plugin.getPluginMeta().getVersion();
 
         copyTree(plugin, "content",
-                pluginsDir.resolve("CraftEngine").resolve("resources").resolve("touhou_little_maid"), version, false);
+                pluginsDir.resolve("CraftEngine").resolve("resources").resolve("touhou_little_maid"), version, false, false);
+        // 模型是生成资产，同版本也要覆盖：转换器修正 display 骨骼/旋转后不能靠版本号跳过。
         copyTree(plugin, "models",
-                pluginsDir.resolve("BetterModel").resolve("models").resolve("touhou_little_maid"), version, false);
+                pluginsDir.resolve("BetterModel").resolve("models").resolve("touhou_little_maid"), version, false, true);
 
         Path runtime = plugin.getDataFolder().toPath().resolve(TLMContentContract.RUNTIME_DIR);
-        // runtime 里会追加新的核心动画文件；同版本时也补缺失文件，不覆盖服主已有修改。
-        copyTree(plugin, "runtime", runtime, version, true);
+        // runtime 里会追加新的核心动画文件；同版本时只补缺失文件，不覆盖服主已有修改。
+        copyTree(plugin, "runtime", runtime, version, true, false);
         writeProtocol(plugin, runtime);
     }
 
     private static void copyTree(Plugin plugin, String jarPrefix, Path target, String version,
-                                 boolean copyMissingWhenCurrent) {
+                                 boolean copyMissingWhenCurrent, boolean overwriteWhenCurrent) {
         Path stamp = target.resolve(STAMP_FILE);
         boolean current = false;
         if (Files.isRegularFile(stamp)) {
             try {
                 if (version.equals(Files.readString(stamp).trim())) {
                     current = true;
-                    if (!copyMissingWhenCurrent) {
+                    if (!copyMissingWhenCurrent && !overwriteWhenCurrent) {
                         plugin.getLogger().info("[资产] " + jarPrefix + " 已是当前版本，跳过释放。");
                         return;
                     }
@@ -86,7 +87,7 @@ public final class AssetsInstaller {
                     if (Files.isDirectory(entry)) {
                         Files.createDirectories(destination);
                     } else {
-                        if (current && Files.exists(destination)) {
+                        if (current && copyMissingWhenCurrent && !overwriteWhenCurrent && Files.exists(destination)) {
                             continue;
                         }
                         Files.createDirectories(destination.getParent());

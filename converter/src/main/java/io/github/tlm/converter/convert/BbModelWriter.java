@@ -209,21 +209,14 @@ public final class BbModelWriter {
                 String cubeName = ids[i] + "#" + index++;
                 // 状态贴片（零厚度平面）与脸面共面，沿模型 -Z 前移固定量，避免独立 display 实体的深度冲突。
                 boolean overlay = overlayBone && isFlat(cube);
-                if (cube.rotation() != null && !isZero(cube.rotation())) {
-                    float[] pivot = cube.pivot() != null ? cube.pivot() : bone.pivot();
-                    if (overlay) {
-                        // 带自身旋转的立方体几何与旋转点一起前移，保证贴片绕正确枢轴旋转。
-                        pivot = new float[]{pivot[0], pivot[1], pivot[2] - OVERLAY_Z_OFFSET};
-                    }
-                    String wrapperUuid = uuid("group:" + cubeName);
-                    // 子骨骼名带前缀，避免与模型自身骨骼重名，也让动画名查找不会误中
-                    groups.add(group(wrapperUuid, "tlmcube_" + sanitize(cubeName), pivot, cube.rotation(), visible[i]));
-                    JsonObject wrapper = outlinerNode(wrapperUuid);
-                    wrapper.getAsJsonArray("children").add(cube(elements, cubeName, cube, pivot, overlay));
-                    children.add(wrapper);
-                } else {
-                    children.add(cube(elements, cubeName, cube, bone.pivot(), overlay));
+                float[] pivot = cube.pivot() != null ? cube.pivot() : bone.pivot();
+                if (overlay) {
+                    // 贴片几何与旋转点一起前移，保证贴片绕正确枢轴旋转。
+                    pivot = new float[]{pivot[0], pivot[1], pivot[2] - OVERLAY_Z_OFFSET};
                 }
+                // BetterModel 支持元素自身 rotation/origin，直接写进元素，避免为每个旋转立方体生成
+                // 额外的 wrapper 骨骼；后者会让一个女仆模型膨胀到上千个 display 实体。
+                children.add(cube(elements, cubeName, cube, pivot, overlay, cube.rotation()));
             }
             nodes.put(ids[i], node);
         }
@@ -354,7 +347,8 @@ public final class BbModelWriter {
      *
      * @param overlay 状态贴片：几何沿模型 -Z 前移 {@link #OVERLAY_Z_OFFSET}，避免与脸面共面
      */
-    private String cube(JsonArray elements, String name, BedrockGeometry.Cube cube, float[] origin, boolean overlay) {
+    private String cube(JsonArray elements, String name, BedrockGeometry.Cube cube, float[] origin,
+                        boolean overlay, float[] rotation) {
         float[] o = cube.origin();
         float[] s = cube.size();
         String uuid = uuid("cube:" + name);
@@ -377,6 +371,10 @@ public final class BbModelWriter {
         element.add("from", vec(from[0], from[1], from[2]));
         element.add("to", vec(to[0], to[1], to[2]));
         element.add("origin", vec(-origin[0], origin[1], origin[2]));
+        if (rotation != null && !isZero(rotation)) {
+            // 与 group() 的 rotation 使用同一空间换算。
+            element.add("rotation", vec(-rotation[0], -rotation[1], rotation[2]));
+        }
         if (cube.inflate() != 0) {
             element.addProperty("inflate", cube.inflate());
         }

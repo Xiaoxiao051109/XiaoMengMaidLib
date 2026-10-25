@@ -60,6 +60,11 @@ public final class ContentPackGenerator {
 
     private static final Gson GSON = new GsonBuilder().disableHtmlEscaping().setPrettyPrinting().create();
     /** 原模组 26.x 资源里缺失的部分物品翻译：转换器补到资源包 en_us / zh_cn。 */
+    /** 1.20 遗留、26.1 已移除的物品：连定义一起移除，避免 /give 和 CE 菜单混入旧物。 */
+    private static final java.util.Set<String> REMOVED_IDS = java.util.Set.of(
+            "crafting_table_backpack", "ender_chest_backpack", "furnace_backpack", "tank_backpack",
+            "maid_bed", "monster_list");
+
     private static final Map<String, String[]> FALLBACK_NAMES = Map.of(
             "ender_chest_backpack", new String[]{"Ender Chest Backpack", "末影箱背包"},
             "crafting_table_backpack", new String[]{"Crafting Table Backpack", "工作台背包"},
@@ -119,6 +124,10 @@ public final class ContentPackGenerator {
         ChairTable.generate(this, items, ChairTable.read());
         BoardTable.generate(this, items);
         JoyTable.writeManifest(this);
+        for (String removed : REMOVED_IDS) {
+            items.remove(id(removed));
+        }
+        applyCategoryTags(items);
 
         JsonObject itemsFile = new JsonObject();
         itemsFile.add("items", items);
@@ -310,8 +319,14 @@ public final class ContentPackGenerator {
             key = "item." + NS + "." + id;
         }
         if (key == null) {
-            // 进度图标一类内部物品没有翻译键，直接用 id
-            return "<!i>" + id;
+            // 内部/家具展示物品也可能没有翻译键：给一个可读名称，不把裸 id 直接暴露给玩家。
+            StringBuilder pretty = new StringBuilder();
+            for (String part : id.split("_")) {
+                if (part.isEmpty()) continue;
+                if (!pretty.isEmpty()) pretty.append(' ');
+                pretty.append(Character.toUpperCase(part.charAt(0))).append(part.substring(1));
+            }
+            return "<!i>" + pretty;
         }
         return "<!i><lang:" + key + ">";
     }
@@ -486,14 +501,59 @@ public final class ContentPackGenerator {
         Files.writeString(file, GSON.toJson(root), StandardCharsets.UTF_8);
     }
 
-    /** 把一个确实面向玩家的物品加入 CE 菜单；内部 display/model 定义不要调用此方法。 */
-    void addCategoryItem(String category, String path) {
-        this.categoryItems.computeIfAbsent(category, key -> new java.util.TreeSet<>()).add(id(path));
+    /** 给分类物品补 settings.tags，根分类用 #tag 聚合，行为与 FD 的分类配置一致。 */
+    private void applyCategoryTags(JsonObject items) {
+        for (Map.Entry<String, Set<String>> entry : this.categoryItems.entrySet()) {
+            String tag = NS + ":" + entry.getKey();
+            for (String itemId : entry.getValue()) {
+                JsonElement element = items.get(itemId);
+                if (element == null || !element.isJsonObject()) {
+                    continue;
+                }
+                JsonObject item = element.getAsJsonObject();
+                JsonObject settings = item.has("settings") && item.get("settings").isJsonObject()
+                        ? item.getAsJsonObject("settings") : new JsonObject();
+                JsonArray tags = settings.has("tags") && settings.get("tags").isJsonArray()
+                        ? settings.getAsJsonArray("tags") : new JsonArray();
+                if (!contains(tags, tag)) {
+                    tags.add(tag);
+                }
+                settings.add("tags", tags);
+                item.add("settings", settings);
+            }
+        }
     }
 
-    /** 创造模式式的物品分类：按要求分组，只列出玩家可获取的物品，内部渲染定义仍保留在 items.yml。 */
+    private static boolean contains(JsonArray array, String value) {
+        for (JsonElement e : array) {
+            if (e.isJsonPrimitive() && value.equals(e.getAsString())) return true;
+        }
+        return false;
+    }
+
+    /** 把一个确实面向玩家的物品加入 CE 菜单；内部 display/model 定义不要调用此方法。 */
+    void addCategoryItem(String category, String path) {
+        this.categoryItems.computeIfAbsent(category, key -> new java.util.LinkedHashSet<>()).add(id(path));
+    }
+
+    /** 创造模式式的物品分类：FD 风格根分类 + 隐藏子分类；内部渲染定义仍保留在 items.yml。 */
     private void writeCategory() throws IOException {
         JsonObject categories = new JsonObject();
+        // 椅子是 26.1 的独立分类图标，但服务端也把它放进家具页，避免玩家找不到。
+        addCategoryItem("furniture", "chair");
+
+        JsonObject root = new JsonObject();
+        root.addProperty("priority", 0);
+        root.addProperty("name", "<!i><lang:item_group.touhou_little_maid.main>");
+        root.addProperty("icon", id("hakurei_gohei"));
+        JsonArray rootList = new JsonArray();
+        String[] keys = {"maid", "bauble", "game", "furniture", "model", "admin", "misc"};
+        for (String key : keys) {
+            rootList.add("#" + NS + ":" + key);
+        }
+        root.add("list", rootList);
+        categories.add(NS + ":categories", root);
+
         category(categories, "maid", "女仆", "maid_spawn_egg", 10);
         category(categories, "bauble", "饰品", "ultramarine_orb_elixir", 20);
         category(categories, "game", "娱乐与棋盘", "gomoku", 30);
@@ -501,9 +561,9 @@ public final class ContentPackGenerator {
         category(categories, "model", "模型与展示", "model_switcher", 50);
         category(categories, "admin", "管理与工具", "favorability_tool_full", 60);
         category(categories, "misc", "其他", "film", 70);
-        JsonObject root = new JsonObject();
-        root.add("categories", categories);
-        writeConfig("categories.yml", root);
+        JsonObject out = new JsonObject();
+        out.add("categories", categories);
+        writeConfig("categories.yml", out);
     }
 
     private void category(JsonObject categories, String key, String display, String icon, int priority) {
@@ -511,6 +571,7 @@ public final class ContentPackGenerator {
         this.categoryItems.getOrDefault(key, Set.of()).forEach(list::add);
         JsonObject category = new JsonObject();
         category.addProperty("priority", priority);
+        category.addProperty("hidden", true);
         category.addProperty("name", "<!i><#F7A8C4>" + display);
         category.addProperty("icon", id(icon));
         category.add("list", list);
