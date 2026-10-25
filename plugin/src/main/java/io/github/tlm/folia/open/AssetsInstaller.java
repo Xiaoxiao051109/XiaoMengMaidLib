@@ -37,22 +37,28 @@ public final class AssetsInstaller {
         String version = plugin.getPluginMeta().getVersion();
 
         copyTree(plugin, "content",
-                pluginsDir.resolve("CraftEngine").resolve("resources").resolve("touhou_little_maid"), version);
+                pluginsDir.resolve("CraftEngine").resolve("resources").resolve("touhou_little_maid"), version, false);
         copyTree(plugin, "models",
-                pluginsDir.resolve("BetterModel").resolve("models").resolve("touhou_little_maid"), version);
+                pluginsDir.resolve("BetterModel").resolve("models").resolve("touhou_little_maid"), version, false);
 
         Path runtime = plugin.getDataFolder().toPath().resolve(TLMContentContract.RUNTIME_DIR);
-        copyTree(plugin, "runtime", runtime, version);
+        // runtime 里会追加新的核心动画文件；同版本时也补缺失文件，不覆盖服主已有修改。
+        copyTree(plugin, "runtime", runtime, version, true);
         writeProtocol(plugin, runtime);
     }
 
-    private static void copyTree(Plugin plugin, String jarPrefix, Path target, String version) {
+    private static void copyTree(Plugin plugin, String jarPrefix, Path target, String version,
+                                 boolean copyMissingWhenCurrent) {
         Path stamp = target.resolve(STAMP_FILE);
+        boolean current = false;
         if (Files.isRegularFile(stamp)) {
             try {
                 if (version.equals(Files.readString(stamp).trim())) {
-                    plugin.getLogger().info("[资产] " + jarPrefix + " 已是当前版本，跳过释放。");
-                    return;
+                    current = true;
+                    if (!copyMissingWhenCurrent) {
+                        plugin.getLogger().info("[资产] " + jarPrefix + " 已是当前版本，跳过释放。");
+                        return;
+                    }
                 }
             } catch (IOException ignored) {
                 // 戳文件读不出来就当作需要重新释放
@@ -80,13 +86,18 @@ public final class AssetsInstaller {
                     if (Files.isDirectory(entry)) {
                         Files.createDirectories(destination);
                     } else {
+                        if (current && Files.exists(destination)) {
+                            continue;
+                        }
                         Files.createDirectories(destination.getParent());
                         Files.copy(entry, destination, StandardCopyOption.REPLACE_EXISTING);
                         count++;
                     }
                 }
             }
-            Files.writeString(stamp, version);
+            if (!current) {
+                Files.writeString(stamp, version);
+            }
             plugin.getLogger().info("[资产] 已释放 " + count + " 个文件 -> " + target);
         } catch (IOException e) {
             plugin.getLogger().warning("[资产] 释放 " + jarPrefix + " 失败: " + e.getMessage()
